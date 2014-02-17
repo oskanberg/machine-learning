@@ -1,6 +1,7 @@
 
 import csv
 from numpy import zeros, ones, array, delete, insert, std
+from itertools import combinations
 from scipy.optimize import minimize
 from matplotlib import pyplot as plt
 
@@ -33,21 +34,24 @@ def linear(input_file_name):
     theta = ones(shape=(x.shape[1], 1))
 
     # minimise the squared loss function wrt theta
-    result = minimize(squared_loss, theta, args=(x, y))
+    result = minimize(squared_loss, theta, args=(x, y), options={ 'maxiter' : 1000 })
+    if not result.success:
+        print result.message
+
     minimised = result.x
     print 'Minimised theta: %s' % str(minimised)
 
-    global p
-    if p:
-        # only plot y once
-        plt.plot(y, 'r-')
-        p = False
-    predictions = x.dot(minimised).flatten()
-    plt.plot(predictions)
-    plt.draw()
+    #global p
+    #if p:
+    #    # only plot y once
+    #    plt.plot(y, 'r-')
+    #    p = False
+    #predictions = x.dot(minimised).flatten()
+    #plt.plot(predictions)
+    #plt.draw()
 
     # return MSE
-    return squared_loss(theta, x, y) / x.shape[0]
+    return squared_loss(minimised, x, y) / x.shape[0]
 
 ##
 # Class for feature expansion:
@@ -58,6 +62,9 @@ class FeatureExpander(object):
 
     def __init__(self, data):
         self.data = data
+
+    def feature_nothing(self, last_ten_days):
+        return 0
 
     def feature_price_yesterday(self, last_ten_days):
         return last_ten_days[-1][-1]
@@ -76,11 +83,6 @@ class FeatureExpander(object):
         start_stock = last_ten_days[0][0]
         final_stock = last_ten_days[-1][0]
         return (final_stock - start_stock)
-
-    def feature_stock_delta_squared(self, last_ten_days):
-        start_stock = last_ten_days[0][0]
-        final_stock = last_ten_days[-1][0]
-        return (final_stock - start_stock) ** 2
 
     def feature_price_volitility(self, last_ten_days):
         prices = [ day[-1] for day in last_ten_days ]
@@ -105,6 +107,10 @@ class FeatureExpander(object):
         self.data = new_data
 
     def write_to_file(self, file_path):
+        # we automatically don't train on today's price
+        # but we need to remove today's stock value
+        for index, row in enumerate(self.data):
+            self.data[index].pop(0)
         with open(file_path, 'w') as f:
             for row in self.data:
                 row = map(str, row)
@@ -119,14 +125,29 @@ if __name__ == '__main__':
 
     expanded_file = 'feature_expansion_tmp.csv'
 
-    fe.expand(FeatureExpander.feature_stock_delta)
-    #fe.expand(FeatureExpander.feature_stock_delta_squared)
-    fe.expand(FeatureExpander.feature_price_delta)
-    #fe.expand(FeatureExpander.feature_price_delta_squared)
-    #fe.expand(FeatureExpander.feature_price_volitility)
-    fe.expand(FeatureExpander.feature_price_yesterday)
-    fe.write_to_file(expanded_file)
+    features = [
+        #FeatureExpander.feature_nothing,
+        FeatureExpander.feature_stock_delta,
+        FeatureExpander.feature_price_delta,
+        FeatureExpander.feature_price_delta_squared,
+        FeatureExpander.feature_price_volitility,
+        FeatureExpander.feature_price_yesterday
+    ]
 
-    print linear(expanded_file)
+    MSEs = {}
+    for feature_combination in combinations(features, 2):
+        fe = FeatureExpander(get_data('stock_price.csv'))
+        for feature in feature_combination:
+            fe.expand(feature)
+        fe.write_to_file(expanded_file)
+        MSEs[':'.join([ f.__name__ for f in feature_combination ])] = linear(expanded_file)
+
+    print MSEs
+    fig = plt.figure()
+    fig.subplots_adjust(bottom=0.5)
+    plt.bar(range(len(MSEs)), MSEs.values(), align='center')
+    plt.xticks(range(len(MSEs)), MSEs.keys())
+    locs, labels = plt.xticks()
+    plt.setp(labels, rotation=10)
     plt.show()
 
