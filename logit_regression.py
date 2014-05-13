@@ -92,7 +92,7 @@ def get_random_guess_accuracy(x, y):
             win += 1
     return win / float(len(y))
 
-def logistic(data):
+def logistic_inner(data):
     # get rid of price
     # data = delete(data, -1, 1)
     # give it a good mix
@@ -110,11 +110,11 @@ def logistic(data):
     x0, y0 = format_data(split0)
 
     print 'minimising split 0'
-    minimised0 = fmin_bfgs(l, thetas, fprime=gradient, args=(x0, y0)).ravel().tolist()
+    minimised0 = fmin_bfgs(l, thetas, args=(x0, y0)).ravel().tolist()
 
     x1, y1 = format_data(split1)
     print 'minimising split 1'
-    minimised1 = fmin_bfgs(l, thetas, fprime=gradient, args=(x1, y1)).ravel().tolist()
+    minimised1 = fmin_bfgs(l, thetas, args=(x1, y1)).ravel().tolist()
 
     print minimised0,minimised1
     mse0 = get_accuracy(minimised0, x1, y1)
@@ -126,13 +126,25 @@ def logistic(data):
     return (mse0 + mse1) / 2.0
 
 
-fe = FeatureExpander('stock_price.csv', True)
-for feature in fe.get_all_features():
-    fe.expand(feature)
+def linear(InputFileName):
+    fe = FeatureExpander(InputFileName, False)
+    print logistic_inner(fe.get_data())
 
-fe.classify(FeatureExpander._classification_price_change)
-fe.write_to_file('feature_expansion_tmp.csv')
+#fe = FeatureExpander('stock_price.csv', True)
+#for feature in fe.get_all_features():
+#    if 'all_price_delta' in feature.__name__ or 'price_yesterday' in feature.__name__:
+#        fe.expand(fe.generate_feature_raised_to_power(feature, 1))
+#        #fe.expand(fe.generate_feature_raised_to_power(feature, 3))
+#        fe.classify(FeatureExpander._classification_price_change)
+#        print feature.__name__
+#result = logistic_inner(fe.get_data())
+#fe.write_to_file('feature_expansion_tmp.csv')
+#print result
 
-result = logistic(fe.get_data())
+#fe.classify(FeatureExpander._classification_price_change)
+#fe.write_to_file('feature_expansion_tmp.csv')
 
-print result
+#result = logistic_inner(fe.get_data())
+#
+#print result
+
